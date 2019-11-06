@@ -4,6 +4,7 @@ import qualified Data.List as L
 
 newtype Program = Program [Rule] deriving Show
 
+{- Outer list = conjunctions, inner list = disjunctions -}
 data Rule = Rule Rel [[Rel]] deriving Show
 
 {- this supports either a relation or a cut operator -}
