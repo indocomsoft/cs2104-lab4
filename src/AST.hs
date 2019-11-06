@@ -7,10 +7,10 @@ newtype Program = Program [Rule] deriving Show
 data Rule = Rule Rel [[Rel]] deriving Show
 
 {- this supports either a relation or a cut operator -}
-data Rel = Rel String [Term] 
+data Rel = Rel String [Term]
          | Cut deriving Show
 
-{- this supports either an atom, variable or functor term -} 
+{- this supports either an atom, variable or functor term -}
 data Term =
   Atom String
   | Var String
