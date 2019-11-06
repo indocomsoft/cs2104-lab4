@@ -17,7 +17,10 @@ symbol c = tokenP
   )
 
 functorP :: Parser (String, [Term]) -- functor and relation have the same parser
-functorP = error "not yet implemented"
+functorP = do
+  Func name terms <- termP
+  return (name, terms)
+
 
 termP :: Parser Term
 termP = do
@@ -46,7 +49,16 @@ relHeadP :: Parser Rel
 relHeadP = fmap (uncurry Rel) functorP
 
 ruleP :: Parser Rule
-ruleP = error "not yet implemented"
+ruleP = do
+  h <- relP
+  b <- option [] body
+  symbol "."
+  return $ Rule h b
+ where
+  body = do
+    symbol ":-"
+    rels <- sepBy1 relP (symbol ",")
+    return [ [rel] | rel <- rels ]
 
 programP :: Parser Program
 programP = fmap Program $ many ruleP
