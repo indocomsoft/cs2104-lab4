@@ -23,5 +23,7 @@ tokensL :: Lexer [(SourcePos, Token)]
 tokensL =
   between spaces spaces
     . flip sepBy spaces
-    $ (pure (,) <*> getPosition <*> tokenP)
-  where tokenP = nameL <|> varL <|> symL
+    $ (pure (,) <*> getPosition <*> tokenPNoSpace)
+ where
+  tokenP        = nameL <|> varL <|> symL
+  tokenPNoSpace = tokenP <* spaces
