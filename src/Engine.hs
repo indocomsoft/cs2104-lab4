@@ -46,8 +46,26 @@ match (Rel name terms) (Rule (Rel name' terms') _) =
   name == name' && length terms == length terms'
 
 
-searchAll :: Program -> Tree -> [Subs]
-searchAll program tree = error "to be implemented"
+startSearch :: Program -> Rel -> [Subs]
+startSearch (Program rules) query = searchAll rules [query] M.empty 0
+
+searchAll :: [Rule] -> [Rel] -> Subs -> Int -> [Subs]
+searchAll _ [] _ _ = []
+searchAll rules originalQueries@(query : queries) subs height =
+  let
+    matchingRules = filter (match query) rules
+    process rule =
+      let
+        Rule head body = rename rule height
+        ruleTerm       = toFunctor head
+        queryTerm      = toFunctor query
+        newQueries     = concat body ++ queries -- assuming no disjunction
+      in case unify queryTerm ruleTerm subs of
+        Nothing      -> []
+        Just newSubs -> if null newQueries
+          then [newSubs]
+          else searchAll rules newQueries newSubs (height + 1)
+  in concatMap process matchingRules
 
 
 {- returns all variables in a relation -}
