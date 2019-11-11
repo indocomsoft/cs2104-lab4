@@ -52,6 +52,11 @@ startSearch (Program rules) query = case searchAll rules [query] M.empty 0 of
   Right subs -> subs
   Left  subs -> subs
 
+containsCut :: [Rel] -> Bool
+containsCut []           = False
+containsCut (Cut : rels) = True
+containsCut (_   : rels) = containsCut rels
+
 searchAll :: [Rule] -> [Rel] -> Subs -> Int -> Either [Subs] [Subs]
 searchAll rules (Cut : queries) subs height = -- Prevent backtracking on cut
   case searchAll rules queries subs (height + 1) of
@@ -70,7 +75,12 @@ searchAll rules (query : queries) subs height =
         Nothing      -> Right []
         Just newSubs -> if null newQueries
           then Right [newSubs]
-          else searchAll rules newQueries newSubs (height + 1)
+          else case searchAll rules newQueries newSubs (height + 1) of
+            Right newSubs -> Right newSubs
+            -- Allows backtracking to parent clause if there is one
+            Left  newSubs -> if height /= 0 && containsCut (concat body)
+              then Right newSubs
+              else Left newSubs
   in interruptibleConcatMap process matchingRules
 
 -- perform concatMap only as long as the return value is Right.
