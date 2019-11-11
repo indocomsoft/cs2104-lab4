@@ -32,7 +32,8 @@ rename (Rule head body) height = Rule
   (renameRel head)
   (map (map renameRel) body)
  where
-  renameRel = toRel . renameTerm . toFunctor
+  renameRel Cut = Cut
+  renameRel rel = toRel . renameTerm . toFunctor $ rel
   toRel (Func name terms) = Rel name terms
   renameTerm (Var v          ) = Var (v ++ show height)
   renameTerm (Func name terms) = Func name (map renameTerm terms)
@@ -47,11 +48,16 @@ match (Rel name terms) (Rule (Rel name' terms') _) =
 
 
 startSearch :: Program -> Rel -> [Subs]
-startSearch (Program rules) query = searchAll rules [query] M.empty 0
+startSearch (Program rules) query = case searchAll rules [query] M.empty 0 of
+  Right subs -> subs
+  Left  subs -> subs
 
-searchAll :: [Rule] -> [Rel] -> Subs -> Int -> [Subs]
-searchAll _ [] _ _ = []
-searchAll rules originalQueries@(query : queries) subs height =
+searchAll :: [Rule] -> [Rel] -> Subs -> Int -> Either [Subs] [Subs]
+searchAll rules (Cut : queries) subs height = -- Prevent backtracking on cut
+  case searchAll rules queries subs (height + 1) of
+    Right newSubs -> Left newSubs
+    Left  newSubs -> Left newSubs
+searchAll rules (query : queries) subs height =
   let
     matchingRules = filter (match query) rules
     process rule =
@@ -61,11 +67,21 @@ searchAll rules originalQueries@(query : queries) subs height =
         queryTerm      = toFunctor query
         newQueries     = concat body ++ queries -- assuming no disjunction
       in case unify queryTerm ruleTerm subs of
-        Nothing      -> []
+        Nothing      -> Right []
         Just newSubs -> if null newQueries
-          then [newSubs]
+          then Right [newSubs]
           else searchAll rules newQueries newSubs (height + 1)
-  in concatMap process matchingRules
+  in interruptibleConcatMap process matchingRules
+
+-- perform concatMap only as long as the return value is Right.
+-- Preserves Right as long as f returns Right, once f returns Left, stop
+interruptibleConcatMap :: (a -> Either [b] [b]) -> [a] -> Either [b] [b]
+interruptibleConcatMap f []       = Right []
+interruptibleConcatMap f (x : xs) = case f x of
+  Right ys -> case interruptibleConcatMap f xs of
+    Right zs -> Right $ ys ++ zs
+    Left  zs -> Left $ ys ++ zs
+  Left ys -> Left ys
 
 
 {- returns all variables in a relation -}
