@@ -6,6 +6,7 @@ c(X):-f(X).
 d(X):-g(X).
 d(X):-h(X).
 e(c).
+f(a).
 f(d).
 g(b).
 h(a).
