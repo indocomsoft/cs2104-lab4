@@ -69,39 +69,40 @@ startSearch (Program rules) query =
     Stop subs _    -> subs
 
 searchAll :: [Rule] -> [RelMetadata] -> Subs -> Int -> Status
-searchAll rules asd@((RelMetadata level Cut) : queries) subs height =
+searchAll _ [] subs _ = Continue [subs]
+searchAll rules ((RelMetadata level Cut) : queries) subs height =
   -- Upon reaching cut, change Status to Stop.
   -- If there are more than one Cut in the queries, the one originating from
   -- the lower height (nearer to the root) prevails
   case searchAll rules queries subs (height + 1) of
-    Continue subs      -> Stop subs level
-    Stop subs newLevel -> Stop subs (min level newLevel)
-searchAll rules asd@(query : queries) subs height =
-  let
-    RelMetadata _ queryRel = query
-    matchingRules          = filter (match queryRel) rules
-    queryTerm              = toFunctor queryRel
-    process rule =
-      let
-        Rule head body = rename rule height
-        ruleTerm       = toFunctor head
-        newQueries     = map (RelMetadata height) (concat body) ++ queries
-      in case unify queryTerm ruleTerm subs of
-        Nothing      -> Continue []
-        Just newSubs -> if null newQueries
-          then Continue [newSubs]
-          else case searchAll rules newQueries newSubs (height + 1) of
-            Continue resultSubs -> Continue resultSubs
-            status@(Stop resultSubs level) ->
-              -- If the cut originates from this level,
-              -- then backtrack to parent clause, otherwise propagate status
-              if level == height then Backtrack resultSubs else status
-  in case interruptibleProcessRules process matchingRules of
-    Backtrack resultSubs -> Continue resultSubs
-    other                -> other
+    Continue newSubs      -> Stop newSubs level
+    Stop newSubs newLevel -> Stop newSubs (min level newLevel)
+    Backtrack newSubs     -> Stop newSubs level
+searchAll rules (query : queries) subs height
+  = let
+      RelMetadata _ queryRel = query
+      matchingRules          = filter (match queryRel) rules
+      queryTerm              = toFunctor queryRel
+      process rule =
+        let
+          Rule head body = rename rule height
+          ruleTerm       = toFunctor head
+          newQueries     = map (RelMetadata height) (concat body) ++ queries
+        in case unify queryTerm ruleTerm subs of
+          Nothing -> Continue []
+          Just newSubs ->
+            case searchAll rules newQueries newSubs (height + 1) of
+              status@(Stop resultSubs level) ->
+                -- If the cut originates from this level,
+                -- then backtrack to parent clause, otherwise propagate status
+                if level == height then Backtrack resultSubs else status
+              other -> other
+    in case interruptibleProcessRules process matchingRules of
+      Backtrack resultSubs -> Continue resultSubs
+      other                -> other
 
 interruptibleProcessRules :: (Rule -> Status) -> [Rule] -> Status
-interruptibleProcessRules f []       = Continue []
+interruptibleProcessRules _ []       = Continue []
 interruptibleProcessRules f (x : xs) = case f x of
   Continue ys -> case interruptibleProcessRules f xs of
     Continue zs   -> Continue (ys ++ zs)
